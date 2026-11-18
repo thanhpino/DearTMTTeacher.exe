@@ -48,3 +48,4 @@ html, body { margin:0; height:100%; background:var(--bg); overflow:hidden;
   font:11px 'JetBrains Mono', ui-monospace, monospace; color:var(--term); opacity:.7; }
 
 @media (prefers-reduced-motion: reduce) { #terminal .caret::after { animation:none; } }
+

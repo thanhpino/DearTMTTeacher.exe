@@ -17,3 +17,4 @@ var el = mk(), term = new G.Terminal(el, w);
 });
 var w2 = G.World.create(G.CONFIG);
 console.log('seeds differ across opens:', w.seed !== w2.seed || 'maybe same ms');
+

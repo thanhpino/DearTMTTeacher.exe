@@ -5,7 +5,7 @@
     // {name} = tên đầy đủ; {title} = cách xưng hô (đổi "Thầy"/"Cô" tại đây nếu muốn)
     teacher: {
       defaultName: 'TS. Bùi Quy Anh',
-      title: 'Thầy/Cô',
+      title: 'Thầy',
       maxNameLength: 40
     },
     colors: {
@@ -71,6 +71,8 @@
         text: 'Cảm ơn {title} đã ở lại đọc bản nháp muộn, khi cả hệ thống của em sắp sập.' },
       { msg: 'feat: auto-scaling niềm tin',
         text: 'Khi em tự nghi ngờ mình, {title} tin giúp em thêm một lần. Niềm tin ấy scale rất tốt.' },
+      { msg: 'docs: câu thần chú của thầy',
+        text: '"Các bạn cứ cố gắng thôi, có gì thầy sẽ hỗ trợ hết mình nhé!" Một câu thôi, mà là bản SLA chân thành nhất em từng được nhận, và {title} chưa một lần vi phạm.' },
       { msg: 'revert: không bao giờ revert học trò',
         text: '{title} chưa từng rollback ai. Mỗi lần em lỗi, {title} chọn fix forward.' },
       { msg: 'release: v1.0 em của hôm nay',
