@@ -1,4 +1,4 @@
-/* Entry: canvas DPR, vòng lặp rAF, tabs ẩn, panel quan sát (D), tương tác con trỏ. */
+/* Entry: canvas DPR, vòng lặp rAF, tabs ẩn, panel quan sát (D), tương tác con trỏ, audio & dashboard. */
 (function (G) {
   'use strict';
   var cfg = G.CONFIG, tween = G.tween;
@@ -37,6 +37,8 @@
   var tree = new G.Tree(world);
   var particles = new G.Particles(world, tree, cfg);
   var terminal = new G.Terminal(document.getElementById('terminal'), world);
+  var sound = new G.SoundEngine(world);
+  var dashboard = new G.Dashboard(world, timeline, particles, sound, cfg);
 
   var canvas = document.getElementById('stage');
   var ctx = canvas.getContext('2d');
@@ -72,7 +74,6 @@
       world.weather.lightning = 0;
       return;
     }
-    // 2 đợt chớp nhẹ cố định theo t ở giây 19.2 và 22.4 để seek() nhất quán
     var d1 = Math.abs(t - 19.2), d2 = Math.abs(t - 22.4);
     var f1 = d1 < 0.25 ? (1 - d1 / 0.25) : 0;
     var f2 = d2 < 0.28 ? (1 - d2 / 0.28) : 0;
@@ -90,15 +91,20 @@
     particles.render(ctx, W, H);
   }
 
-  // Panel quan sát (phím D) & Skip (Space / ArrowRight)
+  // Panel quan sát (phím D) & Skip (Space / ArrowRight khi không gõ trong ô input)
   var debugEl = document.getElementById('debug'), fps = 60, debugOn = false;
   window.addEventListener('keydown', function (e) {
-    if (e.key === 'd' || e.key === 'D') { debugOn = !debugOn; debugEl.hidden = !debugOn; }
-    if (e.key === ' ' || e.key === 'ArrowRight') {
+    var tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea') return;
+
+    if (e.key === 'd' || e.key === 'D') {
+      debugOn = !debugOn;
+      debugEl.hidden = !debugOn;
+    } else if (e.key === ' ' || e.key === 'ArrowRight') {
       e.preventDefault();
-      var i = cfg.stages.indexOf(currentStage(world.t));
-      var next = cfg.stages[Math.min(i + 1, cfg.stages.length - 1)];
-      timeline.seek(next.start);
+      dashboard.skipToNextStage();
+    } else if (e.key === 'Escape') {
+      dashboard.closeCommitModal();
     }
   });
 
@@ -114,14 +120,16 @@
     last = now;
     fps += (1 / Math.max(dt, 0.001) - fps) * 0.08;
 
-    // Adaptive quality: nếu FPS trung bình < 40 thì hạ nhẹ mật độ lá/hạt
+    // Adaptive quality: nếu FPS trung bình < 38 thì hạ nhẹ mật độ lá/hạt
     if (fps < 38 && world.quality > 0.55) world.quality = Math.max(0.5, world.quality - 0.01);
     else if (fps > 52 && world.quality < 1) world.quality = Math.min(1, world.quality + 0.005);
 
     timeline.update(dt);
     updateLightning(world.t);
+    dashboard.render(world.t);
     render();
     terminal.render(world.t);
+    sound.update();
 
     if (debugOn) {
       debugEl.textContent =
@@ -139,4 +147,5 @@
 
   document.getElementById('build-hash').textContent = 'build #' + world.buildHash;
   G.world = world; G.timeline = timeline; G.tree = tree; G.particles = particles;
+  G.dashboard = dashboard; G.sound = sound;
 })(window.GP = window.GP || {});

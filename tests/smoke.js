@@ -6,17 +6,49 @@ require('../js/timeline.js');
 require('../js/tree.js');
 require('../js/particles.js');
 require('../js/terminal.js');
+require('../js/audio.js');
+require('../js/dashboard.js');
 
 var G = window.GP;
-function mk() {
+var noop = function () {};
+var gradMock = { addColorStop: noop };
+var mockCtx = {
+  fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: 'round',
+  createLinearGradient: function () { return gradMock; },
+  createRadialGradient: function () { return gradMock; },
+  clearRect: noop, fillRect: noop, beginPath: noop, moveTo: noop, lineTo: noop,
+  quadraticCurveTo: noop, closePath: noop, fill: noop, stroke: noop,
+  arc: noop, ellipse: noop
+};
+
+function mk(tag) {
   return {
-    children: [], style: {},
-    set textContent(v) { this.children = []; this._t = v; },
-    get textContent() { return this._t; },
-    appendChild(c) { this.children.push(c); }
+    tagName: (tag || 'div').toUpperCase(),
+    children: [], style: {}, hidden: false, className: '', value: '',
+    classList: { toggle: noop },
+    setAttribute: noop, getAttribute: function () { return 'git log'; },
+    addEventListener: noop,
+    getContext: function () { return mockCtx; },
+    set textContent(v) { this.children = []; this._t = String(v); },
+    get textContent() {
+      if (this.children.length) {
+        return this.children.map(function (c) { return c.textContent; }).join(' ');
+      }
+      return this._t || '';
+    },
+    appendChild: function (c) { this.children.push(c); }
   };
 }
-global.document = { createElement: mk };
+
+var byId = {};
+global.document = {
+  createElement: mk,
+  getElementById: function (id) {
+    if (!byId[id]) byId[id] = mk('div');
+    return byId[id];
+  },
+  querySelectorAll: function () { return [mk('button')]; }
+};
 
 var w = G.World.create(G.CONFIG);
 console.log('name len:', w.name.length, 'hash:', w.buildHash);
@@ -35,18 +67,6 @@ var particles = new G.Particles(w, tree, G.CONFIG);
 var totalParticles = particles.rain.length + particles.petals.length + particles.fireflies.length;
 console.log('particles pool -> total:', totalParticles, 'commit fireflies:', particles.commitCount);
 if (totalParticles > 300) throw new Error('Particle budget exceeded');
-
-// Mock Canvas 2D context để test toàn bộ nhánh vẽ không văng lỗi
-var noop = function () {};
-var gradMock = { addColorStop: noop };
-var mockCtx = {
-  fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: 'round',
-  createLinearGradient: function () { return gradMock; },
-  createRadialGradient: function () { return gradMock; },
-  fillRect: noop, beginPath: noop, moveTo: noop, lineTo: noop,
-  quadraticCurveTo: noop, closePath: noop, fill: noop, stroke: noop,
-  arc: noop, ellipse: noop
-};
 
 var tween = G.tween;
 var tracks = [
@@ -67,33 +87,50 @@ var tracks = [
 ];
 var tl = new G.Timeline(w, tracks);
 var el = mk(), term = new G.Terminal(el, w);
+var sound = new G.SoundEngine(w);
+var dash = new G.Dashboard(w, tl, particles, sound, G.CONFIG);
 
-// Test seek xuôi và ngược
-[0, 7.5, 14, 21, 30, 44, 14, 0].forEach(function (t) {
+// Test seek xuôi và ngược qua đủ 6 chặng
+[0, 7.5, 14, 21, 30, 42, 48, 14, 0].forEach(function (t) {
   tl.seek(t);
+  dash.render(t);
   tree.render(mockCtx, 1280, 720);
   particles.render(mockCtx, 1280, 720);
   term.render(t);
   console.log(
     't=' + t + 's',
     'growth=' + w.tree.growth.toFixed(2),
-    'roots=' + w.tree.roots.toFixed(2),
-    'storm=' + w.weather.storm.toFixed(2),
     'bloom=' + w.bloom.toFixed(2),
-    'tod=' + w.timeOfDay.toFixed(2)
+    'monHidden=' + byId['monitor-panel'].hidden,
+    'pushHidden=' + byId['push-panel'].hidden
   );
 });
 
-// Sau khi seek ngược về 14s rồi về 0s, growth ở t=0 phải bằng 0
 if (w.tree.growth !== 0 || w.bloom !== 0) {
   throw new Error('Timeline seek backward not idempotent!');
 }
-// Kiểm tra hitTestCommit ở cảnh Push (t=48s)
+
+// Kiểm tra hitTestCommit + mở modal lời chúc + Easter egg CLI ở cảnh Push (t=48s)
 tl.seek(48);
+dash.render(48);
 particles.render(mockCtx, 1280, 720);
 var f0 = particles.fireflies[0];
 var hit = particles.hitTestCommit(f0.x, f0.y);
 if (hit !== 0) throw new Error('Expected hitTestCommit to hit firefly #0, got ' + hit);
-particles.markCommitRead(0);
-if (!particles.fireflies[0].read) throw new Error('markCommitRead failed');
+
+dash.openCommitModal(8); // Commit số 9: câu thần chú của thầy
+console.log('modal msg:', byId['modal-msg'].textContent);
+if (byId['modal-msg'].textContent.indexOf('thần chú') === -1) {
+  throw new Error('Modal did not render expected commit');
+}
+
+dash.runCommand('sudo thank-you');
+console.log('sudo output lines:', byId['cmd-output'].children.length);
+if (byId['cmd-output'].children.length < 5) throw new Error('sudo thank-you failed');
+
+dash.runCommand('unknown-cmd');
+if (byId['cmd-output'].textContent.indexOf('404:') === -1) {
+  throw new Error('404 Easter egg not triggered');
+}
+
 console.log('ALL SMOKE CHECKS PASSED ✓');

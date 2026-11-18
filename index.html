@@ -8,9 +8,71 @@
 </head>
 <body>
   <canvas id="stage" aria-label="Cây lớn lên theo pipeline"></canvas>
+
+  <!-- Thanh điều khiển góc trên bên phải -->
+  <header id="top-controls" aria-label="Điều khiển nhanh">
+    <button id="btn-env" type="button" class="ctrl-btn" title="Chuyển đổi Ban ngày (Staging) / Ban đêm (Production)">🌙 Env: Production</button>
+    <button id="btn-audio" type="button" class="ctrl-btn" aria-pressed="false" title="Bật/tắt âm thanh tự sinh">🔇 Sound: OFF</button>
+  </header>
+
+  <!-- Gợi ý chạm đom đóm ở cảnh Push -->
+  <button id="firefly-hint" type="button" class="firefly-hint" hidden></button>
+
+  <!-- Terminal cho cảnh Boot (0..10s) và Log bão (16..26s) -->
   <pre id="terminal" aria-live="polite"></pre>
+
+  <!-- Cảnh 5: Grafana Monitor Dashboard (38..46s) -->
+  <section id="monitor-panel" class="glass-card" aria-label="Gratitude Monitoring Dashboard" hidden></section>
+
+  <!-- Cảnh 6: Push & Khám phá tự do (46s+) -->
+  <section id="push-panel" class="glass-card" aria-label="Lời chúc cuối và Terminal tương tác" hidden>
+    <div class="push-header">
+      <span class="push-title">● RELEASE // GRATITUDE v1.0</span>
+      <button id="btn-toggle-finale" type="button" class="mini-btn">▼ Thu gọn</button>
+    </div>
+    <div id="finale-body"></div>
+
+    <!-- Terminal tương tác + Chip gợi ý Easter Egg -->
+    <div class="interactive-cli">
+      <div class="chip-row" aria-label="Gợi ý lệnh">
+        <span class="chip-hint">Gợi ý:</span>
+        <button type="button" class="cmd-chip" data-cmd="git log">git log</button>
+        <button type="button" class="cmd-chip" data-cmd="sudo thank-you">sudo thank-you</button>
+        <button type="button" class="cmd-chip" data-cmd="git blame">git blame</button>
+        <button type="button" class="cmd-chip" data-cmd="help">help</button>
+      </div>
+      <form id="cmd-form" autocomplete="off">
+        <label for="cmd-input" class="cmd-prompt">$</label>
+        <input id="cmd-input" type="text" maxlength="64" placeholder="Gõ lệnh (vd: sudo thank-you) rồi Enter..." aria-label="Nhập lệnh terminal">
+      </form>
+      <div id="cmd-output" class="cmd-output" aria-live="polite" hidden></div>
+    </div>
+  </section>
+
+  <!-- Modal đọc lời chúc khi chạm vào đom đóm -->
+  <div id="commit-modal" class="commit-modal" role="dialog" aria-modal="true" aria-labelledby="modal-msg" hidden>
+    <div class="modal-head">
+      <span id="modal-hash" class="modal-hash"></span>
+      <button id="modal-close" type="button" class="mini-btn" aria-label="Đóng">✕</button>
+    </div>
+    <h3 id="modal-msg" class="modal-msg"></h3>
+    <p id="modal-text" class="modal-text"></p>
+    <div class="modal-nav">
+      <button id="modal-prev" type="button" class="ctrl-btn">← Commit trước</button>
+      <button id="modal-next" type="button" class="ctrl-btn">Commit tiếp →</button>
+    </div>
+  </div>
+
+  <!-- Thanh tiến trình Pipeline 6 chặng ở đáy màn hình -->
+  <footer id="pipeline-footer" aria-label="Tiến trình CI/CD Pipeline">
+    <nav id="pipeline-bar" class="pipeline-bar"></nav>
+    <button id="btn-skip" type="button" class="ctrl-btn skip-btn" title="Phím tắt: Space hoặc →">Skip ⏭</button>
+    <div id="build-hash"></div>
+  </footer>
+
+  <!-- Panel quan sát (nhấn phím D) -->
   <pre id="debug" hidden></pre>
-  <div id="build-hash"></div>
+
   <noscript>Cần bật JavaScript để xem thiệp.</noscript>
   <!-- Script thường (IIFE), KHÔNG dùng type="module" để chạy được bằng file:// -->
   <script src="config/gratitude.config.js"></script>
@@ -19,6 +81,8 @@
   <script src="js/tree.js"></script>
   <script src="js/particles.js"></script>
   <script src="js/terminal.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/dashboard.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

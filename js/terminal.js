@@ -60,6 +60,7 @@
     }
     el.style.opacity = op;
     el.style.visibility = op <= 0.01 ? 'hidden' : 'visible';
+    if (el.classList) el.classList.toggle('storm-mode', t >= 16);
   };
 
   G.Terminal = Terminal;
