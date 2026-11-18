@@ -6,9 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
   verify-and-package:
@@ -30,7 +28,7 @@ jobs:
 
       - name: Package dear-teacher.zip artifact
         run: |
-          zip -r dear-teacher.zip index.html css js config assets README.md LICENSE Dockerfile
+          zip -r dear-teacher.zip index.html css js config assets docs README.md LICENSE Dockerfile
           ls -lh dear-teacher.zip
 
       - name: Upload dear-teacher.zip artifact
@@ -38,19 +36,3 @@ jobs:
         with:
           name: dear-teacher-zip
           path: dear-teacher.zip
-
-  deploy-pages:
-    needs: verify-and-package
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/thanhpino')
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - id: deployment
-        uses: actions/deploy-pages@v4
