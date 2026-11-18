@@ -14,3 +14,4 @@ jobs:
         run: |
           size=$(du -sk --exclude=.git . | cut -f1)
           echo "size=${size}KB"; test "$size" -lt 2048
+

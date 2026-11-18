@@ -14,6 +14,7 @@
     tween('timeOfDay', 0.5, 0.15, 16, 19), tween('timeOfDay', 0.15, 1, 26, 30)
   ];
   var timeline = new G.Timeline(world, tracks);
+  var terminal = new G.Terminal(document.getElementById('terminal'), world);
 
   var canvas = document.getElementById('stage');
   var ctx = canvas.getContext('2d');
@@ -69,6 +70,7 @@
     fps += (1 / Math.max(dt, 0.001) - fps) * 0.1;
     timeline.update(dt);
     render();
+    terminal.render(world.t);
     if (debugOn) {
       debugEl.textContent = 'scene: ' + currentStage(world.t).id + '\nt: ' + world.t.toFixed(1) +
         's\nfps: ' + fps.toFixed(0) + '\nquality: ' + world.quality.toFixed(2);
@@ -79,3 +81,4 @@
   document.getElementById('build-hash').textContent = 'build #' + world.buildHash;
   G.world = world; G.timeline = timeline; // tiện debug trong console
 })(window.GP = window.GP || {});
+
