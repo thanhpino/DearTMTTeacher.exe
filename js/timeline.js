@@ -21,7 +21,8 @@
 
   function Timeline(world, tracks) {
     this.world = world;
-    this.tracks = tracks;
+    // Sắp xếp các track theo t0 tăng dần để chuỗi tween trên cùng 1 path luôn nhất quán
+    this.tracks = tracks.slice().sort(function (a, b) { return a.t0 - b.t0; });
     this.duration = 46;
     this.playing = true;
   }
@@ -30,11 +31,21 @@
   Timeline.prototype.apply = function (t) {
     var w = this.world;
     w.t = t;
+    var seen = {};
     for (var i = 0; i < this.tracks.length; i++) {
       var k = this.tracks[i];
-      var x = (t - k.t0) / (k.t1 - k.t0);
-      x = x < 0 ? 0 : x > 1 ? 1 : x;
-      setPath(w, k.path, k.from + (k.to - k.from) * k.ease(x));
+      if (!seen[k.path]) {
+        seen[k.path] = true;
+        // Track đầu tiên của path này: luôn đặt giá trị khởi đầu kể cả khi t < k.t0
+        var x0 = (t - k.t0) / (k.t1 - k.t0);
+        x0 = x0 < 0 ? 0 : x0 > 1 ? 1 : x0;
+        setPath(w, k.path, k.from + (k.to - k.from) * k.ease(x0));
+      } else if (t >= k.t0) {
+        // Các track nối tiếp trên cùng path: chỉ kích hoạt khi t >= k.t0
+        var x = (t - k.t0) / (k.t1 - k.t0);
+        x = x < 0 ? 0 : x > 1 ? 1 : x;
+        setPath(w, k.path, k.from + (k.to - k.from) * k.ease(x));
+      }
     }
   };
 
@@ -49,4 +60,3 @@
   G.Timeline = Timeline;
   G.tween = tween;
 })(window.GP = window.GP || {});
-

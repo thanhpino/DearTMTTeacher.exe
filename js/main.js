@@ -1,19 +1,41 @@
-/* Entry: canvas DPR, vòng lặp rAF, tabs ẩn, panel quan sát (D). */
+/* Entry: canvas DPR, vòng lặp rAF, tabs ẩn, panel quan sát (D), tương tác con trỏ. */
 (function (G) {
   'use strict';
   var cfg = G.CONFIG, tween = G.tween;
   var world = G.World.create(cfg);
 
-  // Tracks mẫu (sẽ mở rộng ở các bước sau)
+  // Kịch bản 46s: mọi trạng thái của World đều là hàm của t
   var tracks = [
-    tween('tree.growth', 0, 0.35, 10, 16, 'out'),
-    tween('tree.growth', 0.35, 1, 26, 34, 'out'),
-    tween('weather.rain', 0, 1, 16, 19), tween('weather.rain', 1, 0, 24, 26),
-    tween('weather.storm', 0, 1, 16, 19), tween('weather.storm', 1, 0, 24, 26),
-    tween('bloom', 0, 1, 26, 30, 'out'),
-    tween('timeOfDay', 0.5, 0.15, 16, 19), tween('timeOfDay', 0.15, 1, 26, 30)
+    // Cảnh 1: Boot + Commit (0..10s) - mặt đất hiện lên, hạt giống rơi xuống
+    tween('ground',       0,    1,    5.8,  8.0,  'inOut'),
+    tween('seedDrop',     0,    1,    6.6,  9.2,  'out'),
+
+    // Cảnh 2: Build (10..16s) - rễ neural lan xuống đất, mầm và thân cây vươn lên
+    tween('tree.roots',   0,    1,    10.0, 15.6, 'out'),
+    tween('tree.growth',  0,    0.38, 10.2, 16.0, 'out'),
+
+    // Cảnh 3: Test / Bão (16..26s) - trời tối, mưa bão, cây vẫn kiên cường lớn thêm
+    tween('timeOfDay',    0.45, 0.12, 16.0, 18.5, 'inOut'),
+    tween('weather.rain', 0,    1,    16.2, 18.5, 'inOut'),
+    tween('weather.storm',0,    1,    16.5, 19.0, 'inOut'),
+    tween('tree.growth',  0.38, 0.56, 16.0, 25.0, 'inOut'),
+    tween('weather.rain', 1,    0,    24.2, 26.2, 'inOut'),
+    tween('weather.storm',1,    0,    24.2, 26.2, 'inOut'),
+
+    // Cảnh 4: Deploy / WOW (26..38s) - nắng ấm, tán cây bung hết cỡ và nở hoa
+    tween('timeOfDay',    0.12, 0.95, 25.8, 29.5, 'out'),
+    tween('tree.growth',  0.56, 1.0,  26.0, 32.0, 'out'),
+    tween('bloom',        0,    1.0,  26.4, 31.5, 'out'),
+
+    // Cảnh 5 & 6: Monitor (38..46s) -> Push (46s+) - chuyển dần sang đêm đầy sao
+    tween('timeOfDay',    0.95, 0.08, 38.0, 46.0, 'inOut')
   ];
+
   var timeline = new G.Timeline(world, tracks);
+  timeline.apply(0);
+
+  var tree = new G.Tree(world);
+  var particles = new G.Particles(world, tree, cfg);
   var terminal = new G.Terminal(document.getElementById('terminal'), world);
 
   var canvas = document.getElementById('stage');
@@ -31,6 +53,32 @@
     clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 120);
   });
 
+  // Tương tác chuột / cảm ứng để lay lá & đom đóm
+  function onPointerMove(x, y) {
+    var p = world.pointer;
+    p.vx = x - p.x; p.vy = y - p.y;
+    p.x = x; p.y = y; p.active = true;
+  }
+  window.addEventListener('mousemove', function (e) { onPointerMove(e.clientX, e.clientY); });
+  window.addEventListener('touchmove', function (e) {
+    if (e.touches && e.touches[0]) onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  window.addEventListener('mouseleave', function () { world.pointer.active = false; });
+
+  // Sấm chớp an toàn (<= 2 flash/giây trong bão, tắt hẳn nếu prefers-reduced-motion)
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function updateLightning(t) {
+    if (reducedMotion || world.weather.storm < 0.4) {
+      world.weather.lightning = 0;
+      return;
+    }
+    // 2 đợt chớp nhẹ cố định theo t ở giây 19.2 và 22.4 để seek() nhất quán
+    var d1 = Math.abs(t - 19.2), d2 = Math.abs(t - 22.4);
+    var f1 = d1 < 0.25 ? (1 - d1 / 0.25) : 0;
+    var f2 = d2 < 0.28 ? (1 - d2 / 0.28) : 0;
+    world.weather.lightning = Math.max(f1, f2);
+  }
+
   function currentStage(t) {
     for (var i = cfg.stages.length - 1; i >= 0; i--) if (t >= cfg.stages[i].start) return cfg.stages[i];
     return cfg.stages[0];
@@ -38,14 +86,11 @@
 
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = cfg.colors.bg;
-    ctx.fillRect(0, 0, W, H);
-    // Placeholder: sẽ thay bằng tree.js / particles.js
-    ctx.fillStyle = cfg.colors.leaf;
-    ctx.fillRect(W / 2 - 2, H - 60 - 200 * world.tree.growth, 4, 200 * world.tree.growth);
+    tree.render(ctx, W, H);
+    particles.render(ctx, W, H);
   }
 
-  // Panel quan sát
+  // Panel quan sát (phím D) & Skip (Space / ArrowRight)
   var debugEl = document.getElementById('debug'), fps = 60, debugOn = false;
   window.addEventListener('keydown', function (e) {
     if (e.key === 'd' || e.key === 'D') { debugOn = !debugOn; debugEl.hidden = !debugOn; }
@@ -67,18 +112,31 @@
     if (!running) return;
     var dt = Math.min((now - last) / 1000, 0.05);
     last = now;
-    fps += (1 / Math.max(dt, 0.001) - fps) * 0.1;
+    fps += (1 / Math.max(dt, 0.001) - fps) * 0.08;
+
+    // Adaptive quality: nếu FPS trung bình < 40 thì hạ nhẹ mật độ lá/hạt
+    if (fps < 38 && world.quality > 0.55) world.quality = Math.max(0.5, world.quality - 0.01);
+    else if (fps > 52 && world.quality < 1) world.quality = Math.min(1, world.quality + 0.005);
+
     timeline.update(dt);
+    updateLightning(world.t);
     render();
     terminal.render(world.t);
+
     if (debugOn) {
-      debugEl.textContent = 'scene: ' + currentStage(world.t).id + '\nt: ' + world.t.toFixed(1) +
-        's\nfps: ' + fps.toFixed(0) + '\nquality: ' + world.quality.toFixed(2);
+      debugEl.textContent =
+        'scene: ' + currentStage(world.t).id +
+        '\nt: ' + world.t.toFixed(1) + 's' +
+        '\nfps: ' + fps.toFixed(0) +
+        '\nbranches: ' + tree.branches.length +
+        '\nfoliage: ' + (tree.leaves.length + tree.flowers.length) +
+        '\nparticles: ' + (particles.rain.length + particles.petals.length + particles.fireflies.length) +
+        '\ngrowth: ' + world.tree.growth.toFixed(2) + ' | bloom: ' + world.bloom.toFixed(2) +
+        '\nquality: ' + world.quality.toFixed(2);
     }
   }
   requestAnimationFrame(frame);
 
   document.getElementById('build-hash').textContent = 'build #' + world.buildHash;
-  G.world = world; G.timeline = timeline; // tiện debug trong console
+  G.world = world; G.timeline = timeline; G.tree = tree; G.particles = particles;
 })(window.GP = window.GP || {});
-

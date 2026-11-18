@@ -37,11 +37,21 @@
       buildHash: seed.toString(16).slice(0, 6).padStart(6, '0'),
       rand: mulberry32(seed),
       t: 0,
-      tree: { growth: 0 },
-      weather: { rain: 0, storm: 0, wind: 0.2, lightning: 0 },
-      timeOfDay: 0.5,
-      bloom: 0,
-      ground: 0,
+      seedDrop: 0,                // 0..1: hạt giống rơi ở cảnh Commit
+      tree: {
+        growth: 0,                // 0..1: độ lớn của thân và cành
+        roots: 0                  // 0..1: hệ rễ neural dưới đất
+      },
+      weather: {
+        rain: 0,
+        storm: 0,
+        wind: 0.2,
+        lightning: 0
+      },
+      timeOfDay: 0.45,            // 0: đêm sao, 0.15: bão tối, 0.45: chạng vạng, 1: nắng ấm
+      bloom: 0,                   // 0..1: hoa nở ở cảnh Deploy
+      ground: 0,                  // 0..1: độ hiện rõ mặt đất
+      pointer: { x: -9999, y: -9999, vx: 0, vy: 0, active: false },
       audio: { enabled: false, master: 0.6 },
       quality: 1
     };
@@ -49,4 +59,3 @@
 
   G.World = { create: createWorld, mulberry32: mulberry32, hashString: hashString };
 })(window.GP = window.GP || {});
-

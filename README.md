@@ -11,14 +11,16 @@ Thiệp tri ân Ngày Nhà giáo Việt Nam. Ẩn dụ: **trồng người = CI/
 
 ## Cấu trúc
 ```
-index.html · css/style.css · config/gratitude.config.js · js/{world,timeline,terminal,main}.js
+index.html · css/style.css · config/gratitude.config.js · js/{world,timeline,tree,particles,terminal,main}.js
 assets/fonts/ (woff2 cục bộ) · tests/smoke.js · Dockerfile · .github/workflows/ci.yml
 ```
 
 ## Trạng thái
 - [x] Skeleton: World state, Timeline `world = f(t)`, canvas DPR, Skip, panel `D`
-- [x] Font cục bộ (subset Latin + Vietnamese), lời chúc thật trong config
+- [x] Font cục bộ (subset Latin + Vietnamese), lời chúc thật trong config (TS. Bùi Quy Anh)
 - [x] Terminal boot + log bão (hàm của `t`)
-- [ ] Cây thuật toán · mưa/hạt · dashboard · audio · cảnh Push
+- [x] Cây thuật toán (`tree.js`): hạt giống rơi, rễ neural, thân/cành gom batch theo `depth`, gió bão, lá & hoa bung nở ở cảnh Deploy
+- [x] Hệ hạt (`particles.js`): mưa bão, cánh hoa bay, đom đóm + 11 commit nodes tương tác
+- [ ] Thanh tiến trình pipeline click được · Dashboard cảnh Monitor · Modal đọc commit & cảnh Push · Web Audio API
 
 Quy tắc: không dùng ES modules (để `file://` chạy được).

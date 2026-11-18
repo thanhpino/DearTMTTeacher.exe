@@ -10,6 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Syntax check JS
         run: for f in js/*.js config/*.js; do node --check "$f"; done
+      - name: Smoke test (world, timeline, tree, particles, terminal)
+        run: node tests/smoke.js
       - name: Size budget (< 2MB)
         run: |
           size=$(du -sk --exclude=.git . | cut -f1)
