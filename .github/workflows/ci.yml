@@ -1,0 +1,16 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check JS
+        run: for f in js/*.js config/*.js; do node --check "$f"; done
+      - name: Size budget (< 2MB)
+        run: |
+          size=$(du -sk --exclude=.git . | cut -f1)
+          echo "size=${size}KB"; test "$size" -lt 2048

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dear Teacher.exe — The Gratitude Pipeline</title>
+  <style>
+    /* TODO: @font-face cục bộ (JetBrains Mono, Be Vietnam Pro) ở assets/fonts */
+    html, body { margin: 0; height: 100%; background: #0b1f17; overflow: hidden;
+      font-family: 'Be Vietnam Pro', system-ui, sans-serif; color: #7bd88f; }
+    #stage { position: fixed; inset: 0; display: block; }
+    #debug { position: fixed; top: 8px; left: 8px; margin: 0; padding: 8px 10px;
+      font: 12px/1.4 'JetBrains Mono', ui-monospace, monospace; color: #4ee1c1;
+      background: rgba(0,0,0,.6); border: 1px solid #2e7d4f; white-space: pre; }
+    #build-hash { position: fixed; right: 10px; bottom: 6px;
+      font: 11px 'JetBrains Mono', ui-monospace, monospace; color: #4ee1c1; opacity: .7; }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="Cây lớn lên theo pipeline"></canvas>
+  <pre id="debug" hidden></pre>
+  <div id="build-hash"></div>
+  <noscript>Cần bật JavaScript để xem thiệp.</noscript>
+  <!-- Script thường (IIFE), KHÔNG dùng type="module" để chạy được bằng file:// -->
+  <script src="config/gratitude.config.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/timeline.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
