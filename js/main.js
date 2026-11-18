@@ -38,7 +38,7 @@
   var particles = new G.Particles(world, tree, cfg);
   var terminal = new G.Terminal(document.getElementById('terminal'), world);
   var sound = new G.SoundEngine(world);
-  var dashboard = new G.Dashboard(world, timeline, particles, sound, cfg);
+  var dashboard = new G.Dashboard(world, timeline, tree, particles, sound, cfg);
 
   var canvas = document.getElementById('stage');
   var ctx = canvas.getContext('2d');

@@ -1,12 +1,17 @@
-/* Dashboard & UI Controller:
- * - Thanh tiến trình Pipeline 6 chặng click được + nút Skip
- * - Nút Âm thanh (🔊) + nút Staging/Production (Ngày/Đêm)
+/* Dashboard & UI Controller (P0 + P1 + P2):
+ * - Thanh tiến trình Pipeline 6 chặng click được + nút Skip ⏭ (tự đổi thành Replay ↻ ở cảnh cuối)
+ * - Nút Âm thanh nổi bật có pulse "🔊 Bật tiếng" + nút Ngày/Đêm + nút 📸 Lưu ảnh PNG (toBlob)
  * - Cảnh 5 (Monitor 38..46s): Grafana metrics count-up, sparkline canvas, git blame
- * - Cảnh 6 (Push 46s+): Gợi ý đom đóm, Popup đọc lời chúc commit, Lời kết + git push,
- *   và Terminal tương tác (git log, sudo thank-you, help, 404 Easter egg).
+ * - Cảnh 6 (Push 46s+):
+ *   + Banner gợi ý đom đóm ở đáy giữa (mờ nhẹ sau lần click đầu, không đè đỉnh cây)
+ *   + Tự động thu gọn Panel Lời kết khi mở Card Lời chúc đom đóm (và ngược lại) để 2 panel không cạnh tranh
+ *   + Tách riêng thanh Terminal CLI + Chip gợi ý
+ *   + P2: Konami Code (↑↑↓↓←→←→BA) bắn pháo hoa Hoa Sen / Hoa Phượng, click mặt đất gieo thêm cây con
  */
 (function (G) {
   'use strict';
+
+  var KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
@@ -16,18 +21,20 @@
       .replace(/\{title\}/g, cfg.teacher.title);
   }
 
-  function Dashboard(world, timeline, particles, sound, cfg) {
+  function Dashboard(world, timeline, tree, particles, sound, cfg) {
     this.world = world;
     this.timeline = timeline;
+    this.tree = tree;
     this.particles = particles;
     this.sound = sound;
     this.cfg = cfg;
 
     this.activeCommit = -1;
     this.readCount = 0;
-    this.envOverride = null; // null = theo timeline, 'staging' = ngày, 'prod' = đêm
-    this.lastStageId = '';
+    this.envOverride = null;
     this.finaleCollapsed = false;
+    this.hasInteractedFirefly = false;
+    this.konamiIdx = 0;
 
     this._cacheEls();
     this._buildPipelineBar();
@@ -40,17 +47,23 @@
     this.pipelineEl = document.getElementById('pipeline-bar');
     this.monitorEl  = document.getElementById('monitor-panel');
     this.pushEl     = document.getElementById('push-panel');
+    this.cliDockEl  = document.getElementById('cli-dock');
     this.hintEl     = document.getElementById('firefly-hint');
     this.modalEl    = document.getElementById('commit-modal');
     this.btnAudio   = document.getElementById('btn-audio');
     this.btnEnv     = document.getElementById('btn-env');
+    this.btnSnap    = document.getElementById('btn-snap');
     this.btnSkip    = document.getElementById('btn-skip');
+    this.btnToggleFinale = document.getElementById('btn-toggle-finale');
     this.cmdOut     = document.getElementById('cmd-output');
     this.cmdInput   = document.getElementById('cmd-input');
     this.cmdForm    = document.getElementById('cmd-form');
+    this.authorEl   = document.getElementById('author-mark');
+    if (this.authorEl && this.cfg.author) {
+      this.authorEl.textContent = this.cfg.author;
+    }
   };
 
-  // Xây thanh tiến trình 6 chặng: [✓] Plant -> [▶] Build -> ...
   Dashboard.prototype._buildPipelineBar = function () {
     var self = this;
     var wrap = this.pipelineEl;
@@ -91,25 +104,23 @@
     });
   };
 
-  // Xây khung Grafana Dashboard cho cảnh 5 (Monitor)
   Dashboard.prototype._buildMonitorCard = function () {
     var el = this.monitorEl;
     el.textContent = '';
 
     var header = document.createElement('div');
     header.className = 'mon-header';
-    header.textContent = '● GRAFANA // GRATITUDE OBSERVABILITY';
+    header.textContent = '● BẢNG QUAN SÁT // HÀNH TRÌNH TRI ÂN';
     el.appendChild(header);
 
     var grid = document.createElement('div');
     grid.className = 'mon-grid';
 
-    // Metric 1: Uptime count-up
     var m1 = document.createElement('div');
     m1.className = 'mon-metric';
     var m1Lbl = document.createElement('div');
     m1Lbl.className = 'mon-label';
-    m1Lbl.textContent = 'Gratitude uptime';
+    m1Lbl.textContent = 'Độ bền bỉ lòng biết ơn';
     var m1Val = document.createElement('div');
     m1Val.className = 'mon-value ok';
     m1Val.textContent = '100%';
@@ -117,24 +128,22 @@
     m1.appendChild(m1Lbl);
     m1.appendChild(m1Val);
 
-    // Metric 2: Số bug đời Thầy fix giùm
     var m2 = document.createElement('div');
     m2.className = 'mon-metric';
     var m2Lbl = document.createElement('div');
     m2Lbl.className = 'mon-label';
-    m2Lbl.textContent = sub('Bug đời em đã được {title} fix giùm', this.world, this.cfg);
+    m2Lbl.textContent = sub('Lỗi đời em được {title} gỡ giúp', this.world, this.cfg);
     var m2Val = document.createElement('div');
     m2Val.className = 'mon-value fly';
     m2Val.textContent = '∞';
     m2.appendChild(m2Lbl);
     m2.appendChild(m2Val);
 
-    // Metric 3: Incidents
     var m3 = document.createElement('div');
     m3.className = 'mon-metric';
     var m3Lbl = document.createElement('div');
     m3Lbl.className = 'mon-label';
-    m3Lbl.textContent = 'Incidents';
+    m3Lbl.textContent = sub('Lần {title} bỏ cuộc với học trò', this.world, this.cfg);
     var m3Val = document.createElement('div');
     m3Val.className = 'mon-value ok';
     m3Val.textContent = '0';
@@ -146,7 +155,6 @@
     grid.appendChild(m3);
     el.appendChild(grid);
 
-    // Sparkline canvas
     var sparkWrap = document.createElement('div');
     sparkWrap.className = 'mon-spark-wrap';
     var sparkCanvas = document.createElement('canvas');
@@ -158,7 +166,6 @@
     sparkWrap.appendChild(sparkCanvas);
     el.appendChild(sparkWrap);
 
-    // Khung git blame
     var blameBox = document.createElement('div');
     blameBox.className = 'mon-blame';
     var blameCmd = document.createElement('div');
@@ -173,7 +180,6 @@
     el.appendChild(blameBox);
   };
 
-  // Xây khung Lời chúc cuối & git push ở cảnh 6
   Dashboard.prototype._buildFinaleCard = function () {
     var self = this;
     var box = document.getElementById('finale-body');
@@ -208,81 +214,127 @@
     if (!this.hintEl) return;
     var total = this.cfg.commits.length;
     this.hintEl.textContent =
-      this.cfg.hint + ' (' + this.readCount + '/' + total + ' commits) — hoặc bấm vào đây để mở';
+      this.cfg.hint + ' (Đã mở ' + this.readCount + '/' + total + ')';
+  };
+
+  // Đồng bộ đóng/mở giữa Panel Lời kết và Card Lời chúc đom đóm để 2 panel không cạnh tranh
+  Dashboard.prototype.setFinaleCollapsed = function (collapsed) {
+    this.finaleCollapsed = !!collapsed;
+    if (this.pushEl) {
+      this.pushEl.classList.toggle('collapsed', this.finaleCollapsed);
+    }
+    if (this.btnToggleFinale) {
+      this.btnToggleFinale.textContent = this.finaleCollapsed ? '▲ Mở tâm thư' : '▼ Thu gọn';
+    }
   };
 
   Dashboard.prototype._bindEvents = function () {
     var self = this;
 
-    // Nút bật/tắt âm thanh
+    // Nút bật/tắt âm thanh (xoá pulse CTA sau lần bấm đầu tiên)
     if (this.btnAudio) {
       this.btnAudio.addEventListener('click', function () {
         var on = self.sound.toggle();
-        self.btnAudio.textContent = on ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        self.btnAudio.classList.remove('pulse-cta');
+        self.btnAudio.textContent = on ? '🔊 Tiếng: BẬT' : '🔇 Tiếng: TẮT';
         self.btnAudio.setAttribute('aria-pressed', on ? 'true' : 'false');
         if (on) self.sound.playChime(2, 0.14);
       });
     }
 
-    // Nút chuyển chế độ Staging (Ban ngày) / Production (Ban đêm)
+    // Nút chuyển chế độ Ngày / Đêm
     if (this.btnEnv) {
       this.btnEnv.addEventListener('click', function () {
         if (self.envOverride === 'staging') {
           self.envOverride = 'prod';
-          self.btnEnv.textContent = '🌙 Env: Production';
+          self.btnEnv.textContent = '🌙 Cảnh: Đêm sao';
         } else {
           self.envOverride = 'staging';
-          self.btnEnv.textContent = '☀️ Env: Staging';
+          self.btnEnv.textContent = '☀️ Cảnh: Nắng ấm';
         }
       });
     }
 
-    // Nút Skip sang chặng kế tiếp
-    if (this.btnSkip) {
-      this.btnSkip.addEventListener('click', function () {
-        self.skipToNextStage();
+    // P2: Nút chụp lưu ảnh thiệp PNG (canvas.toBlob)
+    if (this.btnSnap) {
+      this.btnSnap.addEventListener('click', function () {
+        self.exportCardPNG();
       });
     }
 
-    // Click lên gợi ý đom đóm -> mở commit tiếp theo chưa đọc
+    // Nút Skip ⏭ (hoặc Replay ↻ khi đã ở chặng cuối)
+    if (this.btnSkip) {
+      this.btnSkip.addEventListener('click', function () {
+        if (self.world.t >= 46) {
+          self.envOverride = null;
+          self.closeCommitModal();
+          self.setFinaleCollapsed(false);
+          self.timeline.seek(0);
+        } else {
+          self.skipToNextStage();
+        }
+      });
+    }
+
+    // Click lên gợi ý đom đóm -> mở lời chúc tiếp theo chưa đọc
     if (this.hintEl) {
       this.hintEl.addEventListener('click', function () {
         var nextIdx = (self.activeCommit + 1) % self.cfg.commits.length;
+        for (var i = 0; i < self.cfg.commits.length; i++) {
+          var cand = (self.activeCommit + 1 + i) % self.cfg.commits.length;
+          if (!self.particles.fireflies[cand] || !self.particles.fireflies[cand].read) {
+            nextIdx = cand;
+            break;
+          }
+        }
         self.openCommitModal(nextIdx);
       });
     }
 
-    // Thu gọn / mở rộng thẻ lời kết để ngắm cây
-    var btnToggleFinale = document.getElementById('btn-toggle-finale');
-    if (btnToggleFinale) {
-      btnToggleFinale.addEventListener('click', function () {
-        self.finaleCollapsed = !self.finaleCollapsed;
-        self.pushEl.classList.toggle('collapsed', self.finaleCollapsed);
-        btnToggleFinale.textContent = self.finaleCollapsed ? '▲ Mở lời chúc' : '▼ Thu gọn';
+    // Thu gọn / mở rộng thẻ tâm thư (nếu mở tâm thư thì đóng card commit bên phải)
+    if (this.btnToggleFinale) {
+      this.btnToggleFinale.addEventListener('click', function () {
+        var nextCollapsed = !self.finaleCollapsed;
+        self.setFinaleCollapsed(nextCollapsed);
+        if (!nextCollapsed) {
+          self.closeCommitModal();
+        }
       });
     }
 
-    // Click trên canvas để bắt đom đóm commit
+    // Click & Hover trên canvas: bắt đom đóm lời chúc hoặc gieo thêm cây con trên mặt đất (P2)
     var canvas = document.getElementById('stage');
     if (canvas) {
       canvas.addEventListener('click', function (e) {
         var idx = self.particles.hitTestCommit(e.clientX, e.clientY);
         if (idx >= 0) {
           self.openCommitModal(idx);
+          return;
+        }
+        // P2: Click vào mặt đất (y >= 80% chiều cao) khi mặt đất đã hiện -> gieo thêm cây con nở hoa
+        var H = window.innerHeight || 720;
+        if (self.world.ground > 0.8 && e.clientY >= H * 0.80) {
+          self.tree.plantSprout(e.clientX, H);
+          self.sound.playChime(5, 0.11);
         }
       });
 
       canvas.addEventListener('mousemove', function (e) {
         var idx = self.particles.hitTestCommit(e.clientX, e.clientY);
-        canvas.style.cursor = idx >= 0 ? 'pointer' : 'default';
+        self.particles.hoveredCommit = idx;
+        var H = window.innerHeight || 720;
+        var onGround = (self.world.ground > 0.8 && e.clientY >= H * 0.81);
+        canvas.style.cursor = (idx >= 0 || onGround) ? 'pointer' : 'default';
       });
     }
 
-    // Điều khiển nút trong Modal commit
+    // Điều khiển nút trong Modal lời chúc
     var btnClose = document.getElementById('modal-close');
     var btnPrev  = document.getElementById('modal-prev');
     var btnNext  = document.getElementById('modal-next');
-    if (btnClose) btnClose.addEventListener('click', function () { self.closeCommitModal(); });
+    if (btnClose) btnClose.addEventListener('click', function () {
+      self.closeCommitModal();
+    });
     if (btnPrev)  btnPrev.addEventListener('click', function () {
       var n = self.cfg.commits.length;
       self.openCommitModal((self.activeCommit - 1 + n) % n);
@@ -292,7 +344,7 @@
       self.openCommitModal((self.activeCommit + 1) % n);
     });
 
-    // Chip gợi ý lệnh terminal (git log, sudo thank-you, help)
+    // Chip gợi ý lệnh terminal
     var chips = document.querySelectorAll('.cmd-chip');
     for (var i = 0; i < chips.length; i++) {
       (function (chip) {
@@ -303,7 +355,6 @@
       })(chips[i]);
     }
 
-    // Form nhập lệnh trực tiếp
     if (this.cmdForm) {
       this.cmdForm.addEventListener('submit', function (e) {
         e.preventDefault();
@@ -312,6 +363,29 @@
         self.runCommand(raw);
       });
     }
+
+    // P2: Bắt tổ hợp phím Konami Code (↑↑↓↓←→←→BA) để bắn pháo hoa Hoa Sen & Hoa Phượng
+    if (window.addEventListener) {
+      window.addEventListener('keydown', function (e) {
+        var key = e.key;
+        var expected = KONAMI[self.konamiIdx];
+        if (key === expected || (key && key.toLowerCase() === expected)) {
+          self.konamiIdx++;
+          if (self.konamiIdx === KONAMI.length) {
+            self.konamiIdx = 0;
+            self.triggerFireworksShow();
+          }
+        } else {
+          self.konamiIdx = (key === KONAMI[0]) ? 1 : 0;
+        }
+      });
+    }
+  };
+
+  Dashboard.prototype.triggerFireworksShow = function () {
+    this.particles.launchFireworks();
+    this.sound.playChime(0, 0.16);
+    this.sound.playChime(4, 0.15);
   };
 
   Dashboard.prototype.skipToNextStage = function () {
@@ -326,7 +400,7 @@
     this.timeline.seek(stages[nextIdx].start + 0.05);
   };
 
-  // Mở popup hiển thị nội dung commit thứ idx
+  // Mở Card lời chúc đom đóm -> tự động thu gọn Panel Tâm thư bên trái để không cạnh tranh
   Dashboard.prototype.openCommitModal = function (idx) {
     var commits = this.cfg.commits;
     if (idx < 0 || idx >= commits.length) return;
@@ -336,8 +410,13 @@
     this.particles.markCommitRead(idx);
     if (!wasRead) {
       this.readCount++;
-      this._updateHintText();
     }
+    this.hasInteractedFirefly = true;
+    if (this.hintEl) this.hintEl.classList.add('dimmed');
+    this._updateHintText();
+
+    // Tự động thu gọn Panel Tâm thư bên trái khi đang mở Card Lời chúc bên phải
+    this.setFinaleCollapsed(true);
 
     this.sound.playChime(idx, 0.16);
 
@@ -345,7 +424,9 @@
     var hash = ((this.world.seed ^ ((idx + 1) * 0x45d9f3b)) >>> 0).toString(16).slice(0, 7);
 
     document.getElementById('modal-hash').textContent =
-      'commit #' + hash + ' (' + (idx + 1) + '/' + commits.length + ')';
+      'Lời chúc #' + (idx + 1) + '/' + commits.length +
+      ' • mã #' + hash +
+      ' (Đã mở ' + this.readCount + '/' + commits.length + ')';
     document.getElementById('modal-msg').textContent = sub(item.msg, this.world, this.cfg);
     document.getElementById('modal-text').textContent = sub(item.text, this.world, this.cfg);
 
@@ -375,26 +456,29 @@
     addLine('$ ' + (cmd || 'help'), 'cmd-echo');
 
     if (!cmd || lower === 'help') {
-      addLine('Các lệnh hỗ trợ:', 'ok');
-      addLine('  • git log         — Xem lịch sử 11 commit tri ân');
+      addLine('Các lệnh khám phá:', 'ok');
+      addLine('  • git log         — Xem danh sách 11 lời chúc tri ân');
       addLine('  • sudo thank-you  — Mở khoá 4 lời nhắn ẩn gửi ' + this.cfg.teacher.title);
-      addLine('  • git blame       — Ai đứng sau sự trưởng thành của chúng em?');
+      addLine('  • pháo hoa        — Bắn pháo hoa Hoa Sen & Hoa Phượng (hoặc bấm Konami ↑↑↓↓←→←→BA)');
+      addLine('  • git blame       — Người đứng sau sự trưởng thành của chúng em');
     } else if (lower === 'git log' || lower === 'git log --oneline') {
       this.cfg.commits.forEach(function (c, i) {
         var h = ((self.world.seed ^ ((i + 1) * 0x45d9f3b)) >>> 0).toString(16).slice(0, 7);
-        addLine(h + ' ' + sub(c.msg, self.world, self.cfg), 'fly');
+        addLine('#' + (i + 1) + ' [' + h + '] ' + sub(c.msg, self.world, self.cfg), 'fly');
       });
-      addLine('→ Chạm vào đom đóm trên cây để đọc chi tiết từng commit.', 'ok');
+      addLine('→ Chạm vào đom đóm trên cây để đọc trọn vẹn từng lời chúc.', 'ok');
     } else if (lower === 'sudo thank-you' || lower === 'sudo thankyou') {
-      addLine('[sudo] password for student: ******** → Access granted ✓', 'ok');
+      addLine('[sudo] Xác thực lòng biết ơn: ******** → Đã mở khoá ✓', 'ok');
       this.cfg.hidden.forEach(function (h) {
         addLine('♥ ' + sub(h, self.world, self.cfg), 'fly');
       });
+    } else if (lower === 'fireworks' || lower === 'phao hoa' || lower === 'pháo hoa' || lower === 'konami') {
+      this.triggerFireworksShow();
+      addLine('✦ Đang bắn pháo hoa Hoa Sen & Hoa Phượng chúc mừng ' + this.cfg.teacher.title + '!', 'fly');
     } else if (lower.indexOf('git blame') === 0) {
       addLine(sub(this.cfg.blame.text, this.world, this.cfg), 'ok');
     } else {
-      // Lệnh sai bất kỳ -> Easter egg 404 Redirecting...
-      addLine(this.cfg.notFound, 'warn');
+      addLine(sub(this.cfg.notFound, this.world, this.cfg), 'warn');
       var pick = this.cfg.commits[Math.floor(Math.random() * this.cfg.commits.length)];
       addLine('↳ ' + sub(pick.text, this.world, this.cfg), 'ok');
     }
@@ -402,14 +486,74 @@
     this.sound.playChime(4, 0.11);
   };
 
-  // Vẽ đường sparkline trên Grafana Dashboard
+  // P2: Xuất ảnh thiệp PNG chất lượng cao bằng canvas.toBlob
+  Dashboard.prototype.exportCardPNG = function () {
+    var srcCanvas = document.getElementById('stage');
+    if (!srcCanvas) return;
+
+    var out = document.createElement('canvas');
+    out.width = srcCanvas.width;
+    out.height = srcCanvas.height;
+    var octx = out.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Copy toàn bộ cảnh cây, đồi núi, sao, đom đóm
+    octx.drawImage(srcCanvas, 0, 0);
+    octx.save();
+    octx.scale(dpr, dpr);
+
+    var W = out.width / dpr;
+    var H = out.height / dpr;
+
+    // Vẽ khung đề tặng trang trọng ở góc trên bên trái của ảnh xuất
+    octx.fillStyle = 'rgba(5, 16, 12, 0.82)';
+    octx.strokeStyle = '#ffd166';
+    octx.lineWidth = 1.5;
+    var boxW = Math.min(W - 32, 460), boxH = 104;
+    octx.fillRect(20, 20, boxW, boxH);
+    octx.strokeRect(20, 20, boxW, boxH);
+
+    octx.fillStyle = '#ffd166';
+    octx.font = '700 17px "Be Vietnam Pro", sans-serif';
+    octx.fillText('Kính tặng ' + this.cfg.teacher.title + ' ' + this.world.name, 34, 48);
+
+    octx.fillStyle = '#e2faea';
+    octx.font = '400 13px "Be Vietnam Pro", sans-serif';
+    octx.fillText('“Các bạn cứ cố gắng thôi, có gì thầy sẽ hỗ trợ hết mình nhé!”', 34, 74);
+
+    octx.fillStyle = '#4ee1c1';
+    octx.font = '400 12px "JetBrains Mono", monospace';
+    octx.fillText(this.cfg.author + ' • build #' + this.world.buildHash, 34, 100);
+    octx.restore();
+
+    function triggerDownload(url) {
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Dear-Teacher-' + this.world.buildHash + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    var self = this;
+    if (out.toBlob) {
+      out.toBlob(function (blob) {
+        if (!blob) return;
+        var url = URL.createObjectURL(blob);
+        triggerDownload.call(self, url);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      }, 'image/png');
+    } else {
+      triggerDownload.call(this, out.toDataURL('image/png'));
+    }
+  };
+
   Dashboard.prototype._drawSparkline = function (t) {
     var ctx = this.sparkCtx;
     if (!ctx) return;
     var W = this.sparkCanvas.width, H = this.sparkCanvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // Lưới ngang mảnh
     ctx.strokeStyle = 'rgba(46, 125, 79, 0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -417,7 +561,6 @@
     ctx.lineTo(W, H * 0.5);
     ctx.stroke();
 
-    // Đường nhịp tim /パルス EduPulse & Gratitude
     ctx.strokeStyle = '#4ee1c1';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -436,7 +579,6 @@
   Dashboard.prototype.render = function (t) {
     var w = this.world;
 
-    // Nếu người dùng bấm nút Staging/Production thì giữ ánh sáng theo lựa chọn
     if (this.envOverride === 'staging') w.timeOfDay = 0.92;
     else if (this.envOverride === 'prod') w.timeOfDay = 0.08;
 
@@ -451,6 +593,15 @@
       var state = j < curIdx ? 'done' : (j === curIdx ? 'active' : 'pending');
       item.btn.className = 'stage-step ' + state;
       item.icon.textContent = j < curIdx ? '[✓]' : (j === curIdx ? '[▶]' : '[ ]');
+    }
+
+    // Nút Skip tự động đổi thành Replay ↻ khi đã tới chặng cuối (t >= 46s)
+    if (this.btnSkip) {
+      var isEnd = (t >= 46);
+      var wantText = isEnd ? 'Replay ↻' : 'Skip ⏭';
+      if (this.btnSkip.textContent !== wantText) {
+        this.btnSkip.textContent = wantText;
+      }
     }
 
     // 2. Cảnh 5: Monitor Dashboard (38s .. 46s)
@@ -479,6 +630,9 @@
         var pFade = clamp01((t - 46) / 1.0);
         this.pushEl.style.opacity = pFade.toFixed(3);
       }
+    }
+    if (this.cliDockEl) {
+      this.cliDockEl.hidden = !showPush;
     }
     if (this.hintEl) {
       this.hintEl.hidden = (t < 44);

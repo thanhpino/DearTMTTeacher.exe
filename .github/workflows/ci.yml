@@ -1,19 +1,56 @@
-name: ci
+name: ci-cd-gratitude-pipeline
 on:
   push:
-    branches: [main]
+    branches: [main, thanhpino]
+    tags: ['v*']
   pull_request:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
-  check:
+  verify-and-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Syntax check JS
-        run: for f in js/*.js config/*.js; do node --check "$f"; done
-      - name: Smoke test (world, timeline, tree, particles, terminal)
+
+      - name: Syntax check all JS files
+        run: for f in js/*.js config/*.js tests/*.js; do node --check "$f"; done
+
+      - name: Run P0 + P1 + P2 smoke tests
         run: node tests/smoke.js
-      - name: Size budget (< 2MB)
+
+      - name: Verify bundle size budget (< 2MB)
         run: |
           size=$(du -sk --exclude=.git . | cut -f1)
-          echo "size=${size}KB"; test "$size" -lt 2048
+          echo "Bundle size: ${size}KB (limit: 2048KB)"
+          test "$size" -lt 2048
 
+      - name: Package dear-teacher.zip artifact
+        run: |
+          zip -r dear-teacher.zip index.html css js config assets README.md LICENSE Dockerfile
+          ls -lh dear-teacher.zip
+
+      - name: Upload dear-teacher.zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dear-teacher-zip
+          path: dear-teacher.zip
+
+  deploy-pages:
+    needs: verify-and-package
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/thanhpino')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4

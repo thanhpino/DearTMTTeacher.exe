@@ -13,22 +13,26 @@ var G = window.GP;
 var noop = function () {};
 var gradMock = { addColorStop: noop };
 var mockCtx = {
-  fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: 'round',
+  fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: 'round', font: '', textBaseline: 'middle',
+  save: noop, restore: noop, translate: noop, rotate: noop, scale: noop,
   createLinearGradient: function () { return gradMock; },
   createRadialGradient: function () { return gradMock; },
-  clearRect: noop, fillRect: noop, beginPath: noop, moveTo: noop, lineTo: noop,
+  clearRect: noop, fillRect: noop, strokeRect: noop, beginPath: noop, moveTo: noop, lineTo: noop,
   quadraticCurveTo: noop, closePath: noop, fill: noop, stroke: noop,
-  arc: noop, ellipse: noop
+  arc: noop, ellipse: noop, fillText: noop,
+  measureText: function (s) { return { width: String(s).length * 7 }; },
+  drawImage: noop
 };
 
 function mk(tag) {
   return {
     tagName: (tag || 'div').toUpperCase(),
-    children: [], style: {}, hidden: false, className: '', value: '',
-    classList: { toggle: noop },
+    children: [], style: {}, hidden: false, className: '', value: '', width: 1280, height: 720,
+    classList: { toggle: noop, add: noop, remove: noop },
     setAttribute: noop, getAttribute: function () { return 'git log'; },
     addEventListener: noop,
     getContext: function () { return mockCtx; },
+    toDataURL: function () { return 'data:image/png;base64,AA=='; },
     set textContent(v) { this.children = []; this._t = String(v); },
     get textContent() {
       if (this.children.length) {
@@ -36,12 +40,15 @@ function mk(tag) {
       }
       return this._t || '';
     },
-    appendChild: function (c) { this.children.push(c); }
+    appendChild: function (c) { this.children.push(c); },
+    removeChild: noop,
+    click: noop
   };
 }
 
 var byId = {};
 global.document = {
+  body: mk('body'),
   createElement: mk,
   getElementById: function (id) {
     if (!byId[id]) byId[id] = mk('div');
@@ -52,6 +59,13 @@ global.document = {
 
 var w = G.World.create(G.CONFIG);
 console.log('name len:', w.name.length, 'hash:', w.buildHash);
+
+// Kiểm tra 11 lời chúc thuần Việt 100% (không dùng feat:/docs:/chore:)
+G.CONFIG.commits.forEach(function (c, idx) {
+  if (/^(feat|fix|docs|chore|perf|hotfix|revert|release):/i.test(c.msg)) {
+    throw new Error('Commit #' + idx + ' still contains English prefix: ' + c.msg);
+  }
+});
 
 var tree = new G.Tree(w);
 console.log(
@@ -88,44 +102,51 @@ var tracks = [
 var tl = new G.Timeline(w, tracks);
 var el = mk(), term = new G.Terminal(el, w);
 var sound = new G.SoundEngine(w);
-var dash = new G.Dashboard(w, tl, particles, sound, G.CONFIG);
+var dash = new G.Dashboard(w, tl, tree, particles, sound, G.CONFIG);
 
-// Test seek xuôi và ngược qua đủ 6 chặng
 [0, 7.5, 14, 21, 30, 42, 48, 14, 0].forEach(function (t) {
   tl.seek(t);
   dash.render(t);
   tree.render(mockCtx, 1280, 720);
   particles.render(mockCtx, 1280, 720);
   term.render(t);
-  console.log(
-    't=' + t + 's',
-    'growth=' + w.tree.growth.toFixed(2),
-    'bloom=' + w.bloom.toFixed(2),
-    'monHidden=' + byId['monitor-panel'].hidden,
-    'pushHidden=' + byId['push-panel'].hidden
-  );
 });
 
 if (w.tree.growth !== 0 || w.bloom !== 0) {
   throw new Error('Timeline seek backward not idempotent!');
 }
 
-// Kiểm tra hitTestCommit + mở modal lời chúc + Easter egg CLI ở cảnh Push (t=48s)
+// Kiểm tra ở cảnh Push (t=48s): nút Skip đổi thành Replay ↻
 tl.seek(48);
 dash.render(48);
+if (byId['btn-skip'].textContent.indexOf('Replay') === -1) {
+  throw new Error('Skip button did not switch to Replay at Push stage');
+}
+
+// Kiểm tra hover tooltip & hitTestCommit + mở modal lời chúc -> tự thu gọn Panel Tâm thư
+particles.hoveredCommit = 0;
 particles.render(mockCtx, 1280, 720);
 var f0 = particles.fireflies[0];
 var hit = particles.hitTestCommit(f0.x, f0.y);
 if (hit !== 0) throw new Error('Expected hitTestCommit to hit firefly #0, got ' + hit);
 
-dash.openCommitModal(8); // Commit số 9: câu thần chú của thầy
+dash.openCommitModal(8);
+console.log('modal header:', byId['modal-hash'].textContent);
 console.log('modal msg:', byId['modal-msg'].textContent);
-if (byId['modal-msg'].textContent.indexOf('thần chú') === -1) {
-  throw new Error('Modal did not render expected commit');
+if (!dash.finaleCollapsed) {
+  throw new Error('Expected push-panel to auto-collapse when commit modal opens');
 }
 
+// Kiểm tra P2: Gieo thêm cây con + Bắn pháo hoa Hoa Sen / Hoa Phượng + Lưu ảnh PNG
+tree.plantSprout(360, 720);
+dash.runCommand('pháo hoa');
+if (particles.fireworks.length === 0) throw new Error('Fireworks did not launch');
+tl.seek(49.2);
+tree.render(mockCtx, 1280, 720);
+particles.render(mockCtx, 1280, 720);
+dash.exportCardPNG();
+
 dash.runCommand('sudo thank-you');
-console.log('sudo output lines:', byId['cmd-output'].children.length);
 if (byId['cmd-output'].children.length < 5) throw new Error('sudo thank-you failed');
 
 dash.runCommand('unknown-cmd');
@@ -133,4 +154,4 @@ if (byId['cmd-output'].textContent.indexOf('404:') === -1) {
   throw new Error('404 Easter egg not triggered');
 }
 
-console.log('ALL SMOKE CHECKS PASSED ✓');
+console.log('ALL P0 + P1 + P2 SMOKE CHECKS PASSED ✓');

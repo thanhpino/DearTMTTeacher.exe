@@ -2,51 +2,50 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dear Teacher.exe — The Gratitude Pipeline</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <canvas id="stage" aria-label="Cây lớn lên theo pipeline"></canvas>
+  <canvas id="stage" aria-label="Cây tri ân lớn lên theo từng chặng"></canvas>
 
-  <!-- Thanh điều khiển góc trên bên phải -->
+  <!-- Thanh điều khiển góc trên bên phải (nút Bật tiếng có hiệu ứng pulse nổi bật trước lần click đầu) -->
   <header id="top-controls" aria-label="Điều khiển nhanh">
-    <button id="btn-env" type="button" class="ctrl-btn" title="Chuyển đổi Ban ngày (Staging) / Ban đêm (Production)">🌙 Env: Production</button>
-    <button id="btn-audio" type="button" class="ctrl-btn" aria-pressed="false" title="Bật/tắt âm thanh tự sinh">🔇 Sound: OFF</button>
+    <button id="btn-env" type="button" class="ctrl-btn" title="Chuyển đổi Ban ngày / Ban đêm">🌙 Cảnh: Đêm sao</button>
+    <button id="btn-snap" type="button" class="ctrl-btn" title="Chụp và tải ảnh thiệp PNG về máy">📸 Lưu ảnh</button>
+    <button id="btn-audio" type="button" class="ctrl-btn pulse-cta" aria-pressed="false" title="Bật/tắt âm thanh mưa và chuông gió">🔊 Bật tiếng</button>
   </header>
-
-  <!-- Gợi ý chạm đom đóm ở cảnh Push -->
-  <button id="firefly-hint" type="button" class="firefly-hint" hidden></button>
 
   <!-- Terminal cho cảnh Boot (0..10s) và Log bão (16..26s) -->
   <pre id="terminal" aria-live="polite"></pre>
 
   <!-- Cảnh 5: Grafana Monitor Dashboard (38..46s) -->
-  <section id="monitor-panel" class="glass-card" aria-label="Gratitude Monitoring Dashboard" hidden></section>
+  <section id="monitor-panel" class="glass-card" aria-label="Bảng quan sát lòng biết ơn" hidden></section>
 
-  <!-- Cảnh 6: Push & Khám phá tự do (46s+) -->
-  <section id="push-panel" class="glass-card" aria-label="Lời chúc cuối và Terminal tương tác" hidden>
+  <!-- Cảnh 6: Tâm thư lời kết (46s+) — tự động thu gọn khi mở Card lời chúc đom đóm -->
+  <section id="push-panel" class="glass-card" aria-label="Tâm thư tri ân Thầy" hidden>
     <div class="push-header">
-      <span class="push-title">● RELEASE // GRATITUDE v1.0</span>
+      <span class="push-title">● TÂM THƯ // LỜI TRI ÂN v1.0</span>
       <button id="btn-toggle-finale" type="button" class="mini-btn">▼ Thu gọn</button>
     </div>
     <div id="finale-body"></div>
+  </section>
 
-    <!-- Terminal tương tác + Chip gợi ý Easter Egg -->
-    <div class="interactive-cli">
-      <div class="chip-row" aria-label="Gợi ý lệnh">
-        <span class="chip-hint">Gợi ý:</span>
-        <button type="button" class="cmd-chip" data-cmd="git log">git log</button>
-        <button type="button" class="cmd-chip" data-cmd="sudo thank-you">sudo thank-you</button>
-        <button type="button" class="cmd-chip" data-cmd="git blame">git blame</button>
-        <button type="button" class="cmd-chip" data-cmd="help">help</button>
-      </div>
-      <form id="cmd-form" autocomplete="off">
-        <label for="cmd-input" class="cmd-prompt">$</label>
-        <input id="cmd-input" type="text" maxlength="64" placeholder="Gõ lệnh (vd: sudo thank-you) rồi Enter..." aria-label="Nhập lệnh terminal">
-      </form>
-      <div id="cmd-output" class="cmd-output" aria-live="polite" hidden></div>
+  <!-- Thanh Terminal tương tác & Chip gợi ý (tách riêng ở góc dưới trái để không làm cao panel Tâm thư) -->
+  <section id="cli-dock" class="glass-card cli-dock" aria-label="Dòng lệnh khám phá" hidden>
+    <div class="chip-row" aria-label="Gợi ý lệnh">
+      <span class="chip-hint">Khám phá:</span>
+      <button type="button" class="cmd-chip" data-cmd="git log">git log</button>
+      <button type="button" class="cmd-chip" data-cmd="sudo thank-you">sudo thank-you</button>
+      <button type="button" class="cmd-chip" data-cmd="pháo hoa">pháo hoa</button>
+      <button type="button" class="cmd-chip" data-cmd="git blame">git blame</button>
+      <button type="button" class="cmd-chip" data-cmd="help">help</button>
     </div>
+    <form id="cmd-form" autocomplete="off">
+      <label for="cmd-input" class="cmd-prompt">$</label>
+      <input id="cmd-input" type="text" maxlength="64" placeholder="Gõ lệnh (vd: sudo thank-you, pháo hoa) rồi Enter..." aria-label="Nhập lệnh terminal">
+    </form>
+    <div id="cmd-output" class="cmd-output" aria-live="polite" hidden></div>
   </section>
 
   <!-- Modal đọc lời chúc khi chạm vào đom đóm -->
@@ -58,19 +57,28 @@
     <h3 id="modal-msg" class="modal-msg"></h3>
     <p id="modal-text" class="modal-text"></p>
     <div class="modal-nav">
-      <button id="modal-prev" type="button" class="ctrl-btn">← Commit trước</button>
-      <button id="modal-next" type="button" class="ctrl-btn">Commit tiếp →</button>
+      <button id="modal-prev" type="button" class="ctrl-btn">← Lời chúc trước</button>
+      <button id="modal-next" type="button" class="ctrl-btn">Lời chúc tiếp →</button>
     </div>
   </div>
 
+  <!-- Banner gợi ý chạm đom đóm: đặt ở đáy giữa (trên thanh pipeline), tự mờ đi sau lần click đầu -->
+  <button id="firefly-hint" type="button" class="firefly-hint" hidden></button>
+
+  <!-- Dấu ấn bản quyền nhẹ góc dưới phải (ngay trên thanh footer) -->
+  <div id="watermark-bar" aria-label="Thông tin tác giả và bản dựng">
+    <span id="author-mark">Trương Minh Thành — Happy Teachers' Day 20/11</span>
+    <span class="wm-sep">•</span>
+    <span id="build-hash"></span>
+  </div>
+
   <!-- Thanh tiến trình Pipeline 6 chặng ở đáy màn hình -->
-  <footer id="pipeline-footer" aria-label="Tiến trình CI/CD Pipeline">
+  <footer id="pipeline-footer" aria-label="Tiến trình 6 chặng">
     <nav id="pipeline-bar" class="pipeline-bar"></nav>
     <button id="btn-skip" type="button" class="ctrl-btn skip-btn" title="Phím tắt: Space hoặc →">Skip ⏭</button>
-    <div id="build-hash"></div>
   </footer>
 
-  <!-- Panel quan sát (nhấn phím D) -->
+  <!-- Panel quan sát kỹ thuật (nhấn phím D) -->
   <pre id="debug" hidden></pre>
 
   <noscript>Cần bật JavaScript để xem thiệp.</noscript>
