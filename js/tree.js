@@ -1,10 +1,9 @@
 /* Tree: sinh trước 1 lần bằng PRNG có seed, render theo world = f(t).
  * Gồm:
- * - Bầu trời đêm sâu + Dải Ngân Hà mờ + Trăng lưỡi liềm tỏa sáng + Sao băng
- * - 4 tầng đồi núi trùng điệp có viền sáng ánh trăng (ridge rim-light) + rừng thông xa + mặt hồ thung lũng lấp lánh + sương mờ
- * - Thảm cỏ đung đưa trên mặt đất + hạt giống rơi + hệ rễ neural
- * - Thân/cành gom batch theo depth (có rim-light nổi bật), lá + hoa nở, và khu vườn gieo thêm cây con (P2).
- * Budget: cành <= 2500, lá + hoa <= 800.
+ * - Bầu trời đêm sâu + Dải Ngân Hà mờ + Trăng lưỡi liềm ở khoảng trời thoáng bên phải + Sao băng
+ * - Tiêu đề nghệ thuật "HAPPY TEACHERS' DAY 20/11" tỏa sáng ở khoảng trời phía trên đỉnh cây
+ * - 4 tầng đồi núi trùng điệp + rừng thông xa + các thanh gợn sóng sáng vàng ấm chạy trải dài toàn bộ chiều ngang màn hình
+ * - Tán cây xum xuê dày dặn (lớp đệm tán + lá chi tiết + hoa bung nở) + khu vườn gieo thêm cây con (P2).
  */
 (function (G) {
   'use strict';
@@ -34,11 +33,13 @@
     this.branches = [];
     this.byDepth = [];
     this.roots = [];
+    this.canopyPads = []; // Lớp đệm tán lá giúp vòm cây xum xuê dày dặn
     this.leaves = [];
     this.flowers = [];
     this.stars = [];
     this.pines = [];
     this.grass = [];
+    this.shimmers = [];   // Các thanh gợn sáng chạy trải dài toàn bộ chiều ngang map
     this.sprouts = [];
     this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -54,15 +55,17 @@
     var rand = this.rand;
     var branches = this.branches;
     var byDepth = this.byDepth;
+    var canopyPads = this.canopyPads;
     var leaves = this.leaves;
     var flowers = this.flowers;
 
+    // Thân chính (depth 0)
     branches.push({
       parent: -1,
       depth: 0,
-      relAngle: (rand() - 0.5) * 0.05,
+      relAngle: (rand() - 0.5) * 0.04,
       lenFrac: 0.185,
-      width: 15.5,
+      width: 16.5,
       birth: 0.0,
       growDur: 0.14,
       phase: rand() * Math.PI * 2,
@@ -71,24 +74,29 @@
     byDepth[0].push(0);
 
     var queue = [0];
-    while (queue.length > 0 && branches.length < 1800) {
+    while (queue.length > 0 && branches.length < 2100) {
       var pIdx = queue.shift();
       var p = branches[pIdx];
       var d = p.depth + 1;
       if (d > MAX_DEPTH) continue;
 
-      var count = (d <= 2 && rand() < 0.38) ? 3 : 2;
-      if (d >= 7 && rand() < 0.22) count = 1;
+      // Tăng tỉ lệ tách 3 nhánh ở tầng 1..3 để bộ khung tán cây dày và tròn đầy hơn hẳn
+      var count = 2;
+      if (d === 1 || (d <= 3 && rand() < 0.58) || (d === 4 && rand() < 0.30)) {
+        count = 3;
+      } else if (d >= 8 && rand() < 0.18) {
+        count = 1;
+      }
 
-      var spread = 0.42 + d * 0.025;
+      var spread = 0.44 + d * 0.024;
       for (var k = 0; k < count; k++) {
         var side = count === 1 ? (rand() - 0.5) : (k / (count - 1) - 0.5) * 2;
-        var jitter = (rand() - 0.5) * 0.21;
+        var jitter = (rand() - 0.5) * 0.22;
         var relAngle = side * spread + jitter;
 
-        var lenDecay = 0.735 + rand() * 0.105;
+        var lenDecay = 0.745 + rand() * 0.10;
         var lenFrac = p.lenFrac * lenDecay;
-        var width = Math.max(1.15, p.width * 0.71);
+        var width = Math.max(1.15, p.width * 0.72);
 
         var baseBirth = (d / (MAX_DEPTH + 1)) * 0.84 + rand() * 0.06;
         var birth = Math.max(p.birth + 0.04, Math.min(0.90, baseBirth));
@@ -109,24 +117,36 @@
         byDepth[d].push(idx);
         queue.push(idx);
 
-        if (d >= 5 && leaves.length < 520 && rand() < 0.72) {
+        // Lớp đệm vòm lá mềm ở tầng cành 5..7 giúp cây nhìn xum xuê, không bị thưa
+        if (d >= 5 && d <= 7 && canopyPads.length < 180 && rand() < 0.55) {
+          canopyPads.push({
+            branch: idx,
+            rx: 14 + rand() * 14,
+            ry: 9 + rand() * 9,
+            birth: Math.min(0.92, birth + 0.05),
+            shade: rand()
+          });
+        }
+
+        // Lá non chi tiết và hoa nở dày hơn (vẫn giữ tổng lá + hoa <= 790 trong budget <= 800)
+        if (d >= 4 && leaves.length < 530 && rand() < 0.82) {
           leaves.push({
             branch: idx,
-            tPos: 0.55 + rand() * 0.45,
+            tPos: 0.35 + rand() * 0.65,
             offsetAngle: (rand() - 0.5) * 1.4,
-            size: 4.4 + rand() * 4.2,
-            birth: Math.min(0.96, birth + growDur * 0.6),
+            size: 5.2 + rand() * 5.2,
+            birth: Math.min(0.96, birth + growDur * 0.5),
             hueShift: rand(),
             phase: rand() * Math.PI * 2
           });
         }
-        if (d >= 6 && flowers.length < 240 && rand() < 0.48) {
+        if (d >= 5 && flowers.length < 260 && rand() < 0.55) {
           flowers.push({
             branch: idx,
-            tPos: 0.7 + rand() * 0.3,
-            size: 5.2 + rand() * 4.2,
-            birthBloom: rand() * 0.65,
-            kind: rand() < 0.35 ? 1 : 0,
+            tPos: 0.55 + rand() * 0.45,
+            size: 5.6 + rand() * 4.6,
+            birthBloom: rand() * 0.62,
+            kind: rand() < 0.38 ? 1 : 0,
             phase: rand() * Math.PI * 2
           });
         }
@@ -192,17 +212,15 @@
         r: 0.55 + rand() * 1.65,
         phase: rand() * Math.PI * 2,
         speed: 0.55 + rand() * 1.15,
-        tint: rand() < 0.25 ? 1 : (rand() < 0.5 ? 2 : 0), // 0: trắng ngọc, 1: vàng ấm, 2: xanh lam
+        tint: rand() < 0.25 ? 1 : (rand() < 0.5 ? 2 : 0),
         sparkle: i < 16
       });
     }
   };
 
-  // Sinh trước rừng thông xa trên sườn đồi và thảm cỏ tiền cảnh
   Tree.prototype._generateLandscapeDetails = function () {
     var rand = this.rand;
-    // Rừng thông xa ở hai bên sườn đồi (tránh vùng trung tâm 0.38..0.62 của cây chính)
-    for (var i = 0; i < 46; i++) {
+    for (var i = 0; i < 48; i++) {
       var u = rand();
       if (u > 0.38 && u < 0.62) {
         u = u < 0.5 ? (u - 0.22) : (u + 0.22);
@@ -214,14 +232,24 @@
       });
     }
 
-    // 85 ngọn cỏ mềm dọc theo triền đồi tiền cảnh
-    for (var j = 0; j < 85; j++) {
+    // 110 ngọn cỏ mềm trải đều toàn bộ chiều ngang mặt đất (0..1)
+    for (var j = 0; j < 110; j++) {
       this.grass.push({
-        xFrac: rand(),
+        xFrac: (j + rand() * 0.85) / 110,
         h: 7 + rand() * 13,
         lean: (rand() - 0.5) * 0.35,
-        phase: rand() * Math.PI * 2,
-        hasDew: rand() < 0.22 // giọt sương/hoa cỏ phát sáng nhẹ ở đầu ngọn cỏ
+        phase: rand() * Math.PI * 2
+      });
+    }
+
+    // 32 thanh gợn sáng vàng ấm chạy trải dài toàn bộ chiều ngang bản đồ (0..W)
+    for (var s = 0; s < 32; s++) {
+      this.shimmers.push({
+        xFrac: (s + rand() * 0.8) / 32,
+        yOffFrac: (rand() - 0.5) * 0.026, // phân bố quanh dải hồ ngang chân đồi
+        halfW: 16 + rand() * 34,
+        speed: (rand() < 0.5 ? 1 : -1) * (0.008 + rand() * 0.014),
+        phase: rand() * Math.PI * 2
       });
     }
   };
@@ -241,18 +269,56 @@
     });
   };
 
-  // Hàm tính độ cao sườn đồi thứ l tại hoành độ tỉ lệ u (0..1)
   Tree.prototype._ridgeY = function (L, u, H, groundY) {
     var baseY = groundY - H * L.yOff;
     var h1 = Math.sin(u * Math.PI * L.freq1 + L.phase) * (H * L.amp1);
     var h2 = Math.cos(u * Math.PI * L.freq2 - L.phase * 0.7) * (H * L.amp2);
     var h3 = Math.sin(u * Math.PI * (L.freq2 * 1.9) + L.phase * 1.3) * (H * L.amp1 * 0.22);
-    // Thung lũng võng nhẹ ở trung tâm để tôn cây chính và mở ra mặt hồ
     var centerDip = Math.exp(-Math.pow((u - 0.5) * 3.0, 2)) * (H * 0.042);
     return baseY - h1 - h2 - h3 + centerDip;
   };
 
-  // Vẽ 4 tầng đồi núi + viền sáng ánh trăng + rừng thông xa + mặt hồ thung lũng + sương mờ
+  // Vẽ dòng chữ nghệ thuật "HAPPY TEACHERS' DAY" ở khoảng trời trống phía trên đỉnh cây
+  Tree.prototype._renderSkyGreeting = function (ctx, W, groundY, tod, storm) {
+    var w = this.world;
+    var bloom = clamp01(w.bloom);
+    if (bloom <= 0.1) return;
+
+    var alpha = clamp01((bloom - 0.1) / 0.65) * (1 - storm * 0.9);
+    if (alpha <= 0.02) return;
+
+    var cx = W * 0.5;
+    var topY = Math.max(26, groundY * 0.068);
+    var pulse = this.reducedMotion ? 1 : (0.90 + 0.10 * Math.sin(w.t * 1.8));
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Quầng sáng nền mềm phía sau dòng chữ
+    var bgGlow = ctx.createRadialGradient(cx, topY + 12, 8, cx, topY + 12, 220);
+    bgGlow.addColorStop(0, 'rgba(255, 209, 102, ' + (alpha * 0.16 * pulse).toFixed(3) + ')');
+    bgGlow.addColorStop(0.6, 'rgba(78, 225, 193, ' + (alpha * 0.06).toFixed(3) + ')');
+    bgGlow.addColorStop(1, 'rgba(11, 31, 23, 0)');
+    ctx.fillStyle = bgGlow;
+    ctx.fillRect(cx - 240, topY - 24, 480, 76);
+
+    // Dòng chính: ✦ HAPPY TEACHERS' DAY 20/11 ✦
+    var titleSize = W < 600 ? 15 : (W < 1100 ? 19 : 22);
+    ctx.font = '700 ' + titleSize + 'px "Be Vietnam Pro", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255, 218, 120, ' + (alpha * 0.96 * pulse).toFixed(3) + ')';
+    ctx.fillText('✦  HAPPY TEACHERS\' DAY 20/11  ✦', cx, topY);
+
+    // Dòng phụ: Kính tặng Thầy TS. Bùi Quy Anh
+    var subSize = W < 600 ? 11.5 : 13.5;
+    ctx.font = '400 ' + subSize + 'px "Be Vietnam Pro", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(180, 248, 225, ' + (alpha * 0.88).toFixed(3) + ')';
+    var titlePrefix = (G.CONFIG && G.CONFIG.teacher && G.CONFIG.teacher.title) ? G.CONFIG.teacher.title + ' ' : '';
+    ctx.fillText('Kính tặng ' + titlePrefix + w.name, cx, topY + titleSize + 5);
+
+    ctx.restore();
+  };
+
   Tree.prototype._renderMountainsAndMist = function (ctx, W, H, groundY, tod, storm) {
     var gAlpha = clamp01(this.world.ground);
     if (gAlpha <= 0.02) return;
@@ -286,7 +352,6 @@
       ctx.closePath();
       ctx.fill();
 
-      // Đường viền sáng ánh trăng / ánh nắng (Ridge Rim-Light) dọc sườn đồi tạo khối sâu
       ctx.strokeStyle = rgbStr(L.rim, ((0.16 - l * 0.025) * gAlpha * (1 - storm * 0.6)).toFixed(3));
       ctx.lineWidth = 1.25;
       ctx.beginPath();
@@ -298,14 +363,12 @@
       }
       ctx.stroke();
 
-      // Trên sườn đồi thứ 3 (l === 2), vẽ hàng cây thông/tùng mờ xa hai bên thung lũng
       if (l === 2) {
         ctx.fillStyle = rgbStr(mixRGB([8, 26, 20], [15, 46, 33], tod), (0.88 * gAlpha).toFixed(3));
         for (var p = 0; p < this.pines.length; p++) {
           var pn = this.pines[p];
           var px = pn.u * W;
           var pyBase = this._ridgeY(L, pn.u, H, groundY) + 3;
-          // Vẽ bóng cây thông 2 tầng tán tam giác
           ctx.beginPath();
           ctx.moveTo(px, pyBase - pn.h);
           ctx.lineTo(px - pn.w * 0.75, pyBase - pn.h * 0.35);
@@ -319,7 +382,6 @@
         }
       }
 
-      // Lớp sương mù mềm trôi giữa các thung lũng
       var mistShift = this.reducedMotion ? 0 : Math.sin(this.world.t * 0.25 + l) * 18;
       var mistGrad = ctx.createLinearGradient(0, baseY - 26, 0, baseY + 38);
       mistGrad.addColorStop(0, 'rgba(78, 225, 193, 0)');
@@ -329,29 +391,31 @@
       ctx.fillRect(mistShift - 20, baseY - 26, W + 40, 64);
     }
 
-    // Mặt hồ thung lũng phẳng lặng ở ngay chân đồi trung tâm, phản chiếu ánh trăng & hoa
-    var lakeY = groundY - H * 0.022;
-    var lakeW = W * 0.44;
-    var lakeX = W * 0.5 - lakeW * 0.5;
-    var lakeGrad = ctx.createLinearGradient(0, lakeY - 6, 0, groundY + 4);
-    lakeGrad.addColorStop(0, 'rgba(28, 86, 68, ' + (0.42 * gAlpha).toFixed(3) + ')');
-    lakeGrad.addColorStop(1, 'rgba(10, 32, 24, ' + (0.15 * gAlpha).toFixed(3) + ')');
+    // Dải sông/hồ trải dài toàn bộ chiều ngang màn hình (0 .. W) dưới chân đồi
+    var lakeY = groundY - H * 0.018;
+    var lakeGrad = ctx.createLinearGradient(0, lakeY - 12, 0, groundY + 6);
+    lakeGrad.addColorStop(0, 'rgba(26, 82, 64, 0)');
+    lakeGrad.addColorStop(0.45, 'rgba(26, 82, 64, ' + (0.38 * gAlpha).toFixed(3) + ')');
+    lakeGrad.addColorStop(1, 'rgba(10, 32, 24, ' + (0.18 * gAlpha).toFixed(3) + ')');
     ctx.fillStyle = lakeGrad;
-    ctx.beginPath();
-    ctx.ellipse(W * 0.5, lakeY + 4, lakeW * 0.5, H * 0.018, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(0, lakeY - 12, W, H * 0.032 + 14);
 
-    // Những gợn nước lấp lánh ánh vàng/xanh ngọc trên mặt hồ
-    var shimmerA = (0.22 + 0.18 * clamp01(this.world.bloom)) * gAlpha;
-    ctx.strokeStyle = 'rgba(255, 220, 130, ' + shimmerA.toFixed(3) + ')';
-    ctx.lineWidth = 1.0;
-    for (var sh = 0; sh < 7; sh++) {
-      var sy = lakeY - 1 + sh * 2.2;
-      var sw = (26 - sh * 2.5) + Math.sin(this.world.t * 1.8 + sh) * 6;
-      var sx = W * 0.5 + Math.cos(this.world.t * 0.9 + sh * 1.7) * (lakeW * 0.18);
+    // Các thanh gợn sáng vàng-nâu chạy trải dài toàn bộ map ngang (0 .. W)
+    var shimmerBaseA = (0.24 + 0.20 * clamp01(this.world.bloom)) * gAlpha;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 1.25;
+    for (var sh = 0; sh < this.shimmers.length; sh++) {
+      var sm = this.shimmers[sh];
+      var uX = ((sm.xFrac + this.world.t * sm.speed) % 1 + 1) % 1;
+      var sx = uX * W;
+      var sy = lakeY + sm.yOffFrac * H;
+      var pulseW = sm.halfW * (0.75 + 0.25 * Math.sin(this.world.t * 1.6 + sm.phase));
+      var aS = shimmerBaseA * (0.65 + 0.35 * Math.sin(this.world.t * 2.1 + sm.phase));
+
+      ctx.strokeStyle = 'rgba(255, 215, 120, ' + aS.toFixed(3) + ')';
       ctx.beginPath();
-      ctx.moveTo(sx - sw, sy);
-      ctx.lineTo(sx + sw, sy);
+      ctx.moveTo(sx - pulseW, sy);
+      ctx.lineTo(sx + pulseW, sy);
       ctx.stroke();
     }
   };
@@ -396,10 +460,8 @@
       ctx.fillRect(0, 0, W, H);
     }
 
-    // Bầu trời đêm: Dải Ngân Hà mờ + Trăng lưỡi liềm + Sao nhấp nháy + Sao băng
     var starAlpha = clamp01((0.46 - tod) / 0.36) * (1 - storm * 0.9);
     if (starAlpha > 0.02) {
-      // 1. Dải Ngân Hà mờ (Milky Way nebula) vắt nhẹ qua bầu trời
       ctx.save();
       var nebGrad = ctx.createRadialGradient(W * 0.62, groundY * 0.26, 20, W * 0.55, groundY * 0.32, Math.max(W, H) * 0.55);
       nebGrad.addColorStop(0, 'rgba(78, 225, 193, ' + (starAlpha * 0.075).toFixed(3) + ')');
@@ -409,20 +471,19 @@
       ctx.fillRect(0, 0, W, groundY);
       ctx.restore();
 
-      // 2. Trăng lưỡi liềm (Crescent Moon) + quầng trăng bạc ở góc trên trái-giữa
-      var moonX = W * 0.22, moonY = groundY * 0.17, moonR = Math.max(18, Math.min(W, H) * 0.032);
-      var moonGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.4, moonX, moonY, moonR * 4.5);
-      moonGlow.addColorStop(0, 'rgba(255, 248, 215, ' + (starAlpha * 0.26).toFixed(3) + ')');
-      moonGlow.addColorStop(0.4, 'rgba(180, 240, 220, ' + (starAlpha * 0.09).toFixed(3) + ')');
+      // Dời Mặt trăng sang vùng trời thoáng bên phải (0.76 * W, 0.18 * groundY) để không bị khung Tâm thư bên trái che
+      var moonX = W * 0.76, moonY = groundY * 0.18, moonR = Math.max(19, Math.min(W, H) * 0.034);
+      var moonGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.4, moonX, moonY, moonR * 4.6);
+      moonGlow.addColorStop(0, 'rgba(255, 248, 215, ' + (starAlpha * 0.28).toFixed(3) + ')');
+      moonGlow.addColorStop(0.4, 'rgba(180, 240, 220, ' + (starAlpha * 0.10).toFixed(3) + ')');
       moonGlow.addColorStop(1, 'rgba(11, 31, 23, 0)');
       ctx.fillStyle = moonGlow;
       ctx.beginPath();
-      ctx.arc(moonX, moonY, moonR * 4.5, 0, Math.PI * 2);
+      ctx.arc(moonX, moonY, moonR * 4.6, 0, Math.PI * 2);
       ctx.fill();
 
-      // Vẽ hình trăng lưỡi liềm bằng 2 cung tròn lệch tâm trên offscreen path
       ctx.save();
-      ctx.fillStyle = 'rgba(255, 250, 225, ' + (starAlpha * 0.92).toFixed(3) + ')';
+      ctx.fillStyle = 'rgba(255, 250, 225, ' + (starAlpha * 0.94).toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(moonX, moonY, moonR, 0.35 * Math.PI, 1.45 * Math.PI, false);
       ctx.arc(moonX + moonR * 0.44, moonY - moonR * 0.18, moonR * 0.88, 1.38 * Math.PI, 0.42 * Math.PI, true);
@@ -430,7 +491,6 @@
       ctx.fill();
       ctx.restore();
 
-      // 3. 150 ngôi sao đa sắc độ nhấp nháy chậm
       for (var i = 0; i < this.stars.length; i++) {
         var s = this.stars[i];
         var tw = this.reducedMotion ? 0.8 : (0.38 + 0.62 * Math.sin(w.t * s.speed + s.phase));
@@ -455,7 +515,6 @@
         }
       }
 
-      // 4. Sao băng (Shooting Star) xuất hiện nhẹ nhàng mỗi chu kỳ 7 giây
       if (!this.reducedMotion) {
         var cycle = w.t % 7.0;
         if (cycle > 1.2 && cycle < 2.1) {
@@ -481,10 +540,11 @@
       }
     }
 
-    // 4 lớp đồi núi + rừng thông xa + mặt hồ thung lũng + sương mờ
+    // Dòng chữ nghệ thuật "✦ HAPPY TEACHERS' DAY 20/11 ✦" ở khoảng trời trống phía trên đỉnh cây
+    this._renderSkyGreeting(ctx, W, groundY, tod, storm);
+
     this._renderMountainsAndMist(ctx, W, H, groundY, tod, storm);
 
-    // Quầng sáng hào quang phía sau tán cây chính
     var haloStrength = clamp01(w.tree.growth - 0.25) * (0.48 + 0.52 * clamp01(w.bloom)) * (1 - storm * 0.8);
     if (haloStrength > 0.02) {
       var hx = W * 0.5, hy = groundY - Math.min(W, H) * 0.34;
@@ -502,7 +562,6 @@
       ctx.fillRect(0, 0, W, groundY);
     }
 
-    // Mặt đất tiền cảnh + sương mỏng + thảm cỏ đung đưa
     var gAlpha = clamp01(w.ground);
     if (gAlpha > 0.01) {
       var groundMist = ctx.createLinearGradient(0, groundY - 28, 0, groundY + 12);
@@ -533,7 +592,6 @@
       ctx.quadraticCurveTo(W * 0.5, groundY - 10, W, groundY + 6);
       ctx.stroke();
 
-      // Thảm cỏ mềm và giọt sương phát sáng dọc theo triền đồi
       var wind = w.weather.wind + w.weather.storm * 0.7;
       ctx.strokeStyle = 'rgba(88, 196, 132, ' + (0.52 * gAlpha).toFixed(3) + ')';
       ctx.lineWidth = 1.15;
@@ -541,7 +599,6 @@
       for (var gIdx = 0; gIdx < this.grass.length; gIdx++) {
         var gr = this.grass[gIdx];
         var gx = gr.xFrac * W;
-        // Độ cao mặt đồi parabol tại gx
         var uG = gr.xFrac;
         var gy = groundY + 6 - 16 * (4 * uG * (1 - uG));
         var sway = this.reducedMotion ? 0 : Math.sin(w.t * 2.1 + gr.phase) * (2.5 + wind * 5);
@@ -738,11 +795,29 @@
     if (g < 0.22) return;
 
     var branches = this.branches;
+    var canopyPads = this.canopyPads;
     var leaves = this.leaves;
     var flowers = this.flowers;
     var q = clamp01(w.quality);
     var leafStep = q < 0.65 ? 2 : 1;
 
+    // 1. Vẽ lớp đệm tán lá mềm ở tầng giữa để vòm cây đầy đặn, xum xuê
+    for (var c = 0; c < canopyPads.length; c += leafStep) {
+      var pad = canopyPads[c];
+      var bp = branches[pad.branch];
+      if (!bp || bp.curScale < 0.4) continue;
+      var pScale = clamp01((g - pad.birth) / 0.16) * bp.curScale;
+      if (pScale <= 0) continue;
+
+      ctx.fillStyle = pad.shade > 0.5
+        ? 'rgba(42, 118, 74, 0.34)'
+        : 'rgba(62, 148, 94, 0.30)';
+      ctx.beginPath();
+      ctx.ellipse(bp.x1, bp.y1, pad.rx * pScale, pad.ry * pScale, bp.angle * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Vẽ các cụm lá non chi tiết (vẽ cặp lá đan nhau để tán lá dày gấp đôi mà không vượt budget)
     for (var i = 0; i < leaves.length; i += leafStep) {
       var lf = leaves[i];
       var b = branches[lf.branch];
@@ -753,13 +828,16 @@
       var lx = lerp(b.x0, b.x1, lf.tPos);
       var ly = lerp(b.y0, b.y1, lf.tPos);
       var r = lf.size * lScale;
+      var angL = b.angle + lf.offsetAngle;
 
-      ctx.fillStyle = lf.hueShift > 0.5 ? 'rgba(123, 216, 143, 0.84)' : 'rgba(92, 200, 130, 0.80)';
+      ctx.fillStyle = lf.hueShift > 0.5 ? 'rgba(123, 216, 143, 0.86)' : 'rgba(84, 192, 122, 0.82)';
       ctx.beginPath();
-      ctx.ellipse(lx, ly, r, r * 0.58, b.angle + lf.offsetAngle, 0, Math.PI * 2);
+      ctx.ellipse(lx, ly, r, r * 0.60, angL, 0, Math.PI * 2);
+      ctx.ellipse(lx + Math.cos(angL + 1.1) * r * 0.45, ly + Math.sin(angL + 1.1) * r * 0.45, r * 0.82, r * 0.50, angL + 0.7, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // 3. Vẽ hoa bung nở rực rỡ
     var bloom = clamp01(w.bloom);
     if (bloom <= 0.005) return;
 

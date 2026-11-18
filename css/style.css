@@ -185,16 +185,20 @@ html, body {
   margin-top: 4px; font-weight: 700; font-size: 14.5px; color: var(--fly);
 }
 
-/* Cảnh 6: Panel Tâm thư lời kết (gọn gàng, đặt góc trên-trái vừa tầm mắt) */
+/* Cảnh 6: Panel Tâm thư lời kết (gọn gàng, không hiện thanh cuộn trắng thô) */
 #push-panel {
   position: fixed;
   left: var(--safe-left);
   top: 62px;
   width: min(calc(100vw - 36px), 410px);
-  max-height: 44vh;
+  max-height: 54vh;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--moss) transparent;
   padding: 14px 16px;
 }
+#push-panel::-webkit-scrollbar { width: 5px; }
+#push-panel::-webkit-scrollbar-thumb { background: var(--moss); border-radius: 4px; }
 #push-panel.collapsed {
   width: auto;
   padding: 9px 13px;
